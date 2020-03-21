@@ -21922,6 +21922,16 @@ test_901() {
 }
 run_test 901 "don't leak a mgc lock on client umount"
 
+# LU-13377
+test_902() {
+	#define OBD_FAIL_LLITE_SHORT_COMMIT 0x1415
+	$LCTL set_param fail_loc=0x1415
+	dd if=/dev/zero of=$DIR/$tfile bs=1M count=1
+	cancel_lru_locks osc
+	rm -f $DIR/$tfile
+}
+run_test 902 "test short write doesn't hang lustre"
+
 complete $SECONDS
 [ -f $EXT2_DEV ] && rm $EXT2_DEV || true
 check_and_cleanup_lustre
