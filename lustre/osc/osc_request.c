@@ -1933,21 +1933,19 @@ static int osc_brw_redo_request(struct ptlrpc_request *request,
                 RETURN(rc);
 
 	list_for_each_entry(oap, &aa->aa_oaps, oap_rpc_item) {
-                if (oap->oap_request != NULL) {
-                        LASSERTF(request == oap->oap_request,
-                                 "request %p != oap_request %p\n",
-                                 request, oap->oap_request);
-                        if (oap->oap_interrupted) {
-                                ptlrpc_req_finished(new_req);
-                                RETURN(-EINTR);
-                        }
-                }
-        }
-        /* New request takes over pga and oaps from old request.
-         * Note that copying a list_head doesn't work, need to move it... */
-        aa->aa_resends++;
-        new_req->rq_interpret_reply = request->rq_interpret_reply;
-        new_req->rq_async_args = request->rq_async_args;
+		if (oap->oap_request != NULL) {
+			LASSERTF(request == oap->oap_request,
+				 "request %p != oap_request %p\n",
+				 request, oap->oap_request);
+		}
+	}
+	/*
+	 * New request takes over pga and oaps from old request.
+	 * Note that copying a list_head doesn't work, need to move it...
+	 */
+	aa->aa_resends++;
+	new_req->rq_interpret_reply = request->rq_interpret_reply;
+	new_req->rq_async_args = request->rq_async_args;
 	new_req->rq_commit_cb = request->rq_commit_cb;
 	/* cap resend delay to the current request timeout, this is similar to
 	 * what ptlrpc does (see after_reply()) */
@@ -2184,7 +2182,6 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
 	int				mem_tight = 0;
 	int				page_count = 0;
 	bool				soft_sync = false;
-	bool				interrupted = false;
 	bool				ndelay = false;
 	int				i;
 	int				grant = 0;
@@ -2241,8 +2238,6 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
 			else
 				LASSERT(oap->oap_page_off + oap->oap_count ==
 					PAGE_SIZE);
-			if (oap->oap_interrupted)
-				interrupted = true;
 		}
 		if (ext->oe_ndelay)
 			ndelay = true;
@@ -2281,8 +2276,6 @@ int osc_build_rpc(const struct lu_env *env, struct client_obd *cli,
 	req->rq_interpret_reply = brw_interpret;
 	req->rq_memalloc = mem_tight != 0;
 	oap->oap_request = ptlrpc_request_addref(req);
-	if (interrupted && !req->rq_intr)
-		ptlrpc_mark_interrupted(req);
 	if (ndelay) {
 		req->rq_no_resend = req->rq_no_delay = 1;
 		/* probably set a shorter timeout value.
